@@ -27,10 +27,6 @@ const TEMPLATE_HASH_ALGOS: &[(HashAlgorithm, &str)] = &[
 fn parses_builtin_tcb_policy() {
     let text = fs::read_to_string(testdata("policies/builtin-tcb-policy")).unwrap();
     let policy = parse_policy(&text).unwrap();
-    // The kernel's built-in `ima_tcb` policy expands to roughly a dozen rules:
-    // a handful of `dont_measure fsmagic=…` lines plus the trailing
-    // `measure func=…` rules. We don't pin the exact count (it has wandered
-    // across kernel versions), only that every non-comment line parsed.
     let non_blank = text
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
