@@ -11,7 +11,7 @@ repository = "https://github.com/hyperfinitism/ima-parser"
 license = "Apache-2.0"
 # keywords = []
 # categories = []
-include = ["src/**/*", "examples/**/*"]
+include = ["src/**/*", "examples/**/*", "LICENSE"]
 
 [[example]]
 name = "parse_binary_log"
