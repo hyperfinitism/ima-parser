@@ -105,7 +105,7 @@ fn ascii_logs_template_hashes_verify() {
                 Some(true),
                 "{}: event {i} ({}) failed template-hash verification",
                 path.display(),
-                ev.template_name,
+                ev.template.as_str(),
             );
         }
     }
@@ -154,7 +154,7 @@ fn binary_logs_template_hashes_verify() {
                 Some(true),
                 "{}: event {i} ({}) failed template-hash verification",
                 path.display(),
-                ev.template_name,
+                ev.template.as_str(),
             );
         }
     }
@@ -186,7 +186,8 @@ fn ascii_and_binary_logs_agree() {
         for (i, (a, b)) in ascii_events.iter().zip(binary_events.iter()).enumerate() {
             assert_eq!(a.pcr_index, b.pcr_index, "event {i}: pcr differs");
             assert_eq!(
-                a.template_name, b.template_name,
+                a.template.as_str(),
+                b.template.as_str(),
                 "event {i}: template name differs",
             );
             // The first event is `boot_aggregate`; its template_hash differs
@@ -194,13 +195,14 @@ fn ascii_and_binary_logs_agree() {
             assert!(
                 template_payload_eq(&a.template_data, &b.template_data),
                 "event {i} ({}): template_data differs between ASCII and binary",
-                a.template_name,
+                a.template.as_str(),
             );
             if i > 0 {
                 assert_eq!(
-                    a.template_hash, b.template_hash,
+                    a.template_hash,
+                    b.template_hash,
                     "event {i} ({}): template_hash differs between ASCII and binary",
-                    a.template_name,
+                    a.template.as_str(),
                 );
             }
         }

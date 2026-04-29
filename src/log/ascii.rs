@@ -5,7 +5,7 @@
 //! The format of `/sys/kernel/security/ima/ascii_runtime_measurements_*` is:
 //!
 //! ```text
-//! <pcr> <template_hash_hex> <template_name> <template_specific fields…>
+//! <pcr> <template_hash_hex> <template> <template_specific fields…>
 //! ```
 //!
 //! with SP (`' '`) as the token separator and LF (`'\n'`) as the record
@@ -23,10 +23,8 @@ use crate::hash::HashAlgorithm;
 
 use super::event::Event;
 use super::template::{
-    Digest, ImaBufEntry, ImaEntry, ImaNgEntry, ImaSigEntry, TemplateData, TemplateField,
-};
-use super::{
-    IMA_BUF_TEMPLATE_NAME, IMA_NG_TEMPLATE_NAME, IMA_SIG_TEMPLATE_NAME, IMA_TEMPLATE_NAME,
+    Digest, DigestType, DigestV2, EvmSigEntry, ImaBufEntry, ImaEntry, ImaModsigEntry, ImaNgEntry,
+    ImaNgV2Entry, ImaSigEntry, ImaSigV2Entry, Template, TemplateData, TemplateField,
 };
 
 /// Parse an entire ASCII measurement log (one event per line).
@@ -68,25 +66,30 @@ pub fn parse_ascii_line(line: &str) -> Result<Event> {
         .next()
         .ok_or_else(|| Error::malformed("missing template name"))?
         .to_owned();
+    let template = Template::parse(&template_name);
 
     let rest: Vec<&str> = toks.collect();
-    let (template_data, template_data_raw) = parse_template_payload(&template_name, &rest)?;
+    let (template_data, template_data_raw) = parse_template_payload(&template, &rest)?;
 
     Ok(Event {
         pcr_index,
         template_hash,
-        template_name,
+        template,
         template_data,
         template_data_raw,
     })
 }
 
-fn parse_template_payload(template_name: &str, fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
-    match template_name {
-        n if n == IMA_NG_TEMPLATE_NAME => parse_ima_ng(fields),
-        n if n == IMA_SIG_TEMPLATE_NAME => parse_ima_sig(fields),
-        n if n == IMA_BUF_TEMPLATE_NAME => parse_ima_buf(fields),
-        n if n == IMA_TEMPLATE_NAME => parse_legacy_ima(fields),
+fn parse_template_payload(template: &Template, fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
+    match template {
+        Template::ImaNg => parse_ima_ng(fields),
+        Template::ImaSig => parse_ima_sig(fields),
+        Template::ImaBuf => parse_ima_buf(fields),
+        Template::ImaModsig => parse_ima_modsig(fields),
+        Template::ImaNgV2 => parse_ima_ngv2(fields),
+        Template::ImaSigV2 => parse_ima_sigv2(fields),
+        Template::EvmSig => parse_evm_sig(fields),
+        Template::Ima => parse_legacy_ima(fields),
         _ => {
             // Unknown template: preserve every whitespace-separated token as
             // its own opaque field so callers can still inspect the payload.
@@ -105,6 +108,107 @@ fn parse_template_payload(template_name: &str, fields: &[&str]) -> Result<(Templ
             Ok((TemplateData::Unknown(unknown), Vec::new()))
         }
     }
+}
+
+fn parse_ima_ngv2(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
+    if fields.len() < 2 {
+        return Err(Error::malformed(
+            "ima-ngv2 expects <dtype:algo:hex> <filename>",
+        ));
+    }
+    let digest = parse_prefixed_digest_v2(fields[0])?;
+    let filename = unescape_filename(&fields[1..].join(" "));
+    let raw = Vec::new();
+    Ok((
+        TemplateData::ImaNgV2(ImaNgV2Entry { digest, filename }),
+        raw,
+    ))
+}
+
+fn parse_ima_sigv2(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
+    if fields.len() < 2 {
+        return Err(Error::malformed(
+            "ima-sigv2 expects <dtype:algo:hex> <filename> [<sig>]",
+        ));
+    }
+    let digest = parse_prefixed_digest_v2(fields[0])?;
+    let (filename, signature) = if fields.len() >= 3 && looks_like_hex(fields[fields.len() - 1]) {
+        (
+            unescape_filename(&fields[1..fields.len() - 1].join(" ")),
+            decode_hex(fields[fields.len() - 1])?,
+        )
+    } else {
+        (unescape_filename(&fields[1..].join(" ")), Vec::new())
+    };
+    Ok((
+        TemplateData::ImaSigV2(ImaSigV2Entry {
+            digest,
+            filename,
+            signature,
+        }),
+        Vec::new(),
+    ))
+}
+
+fn parse_ima_modsig(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
+    if fields.len() < 3 {
+        return Err(Error::malformed(
+            "ima-modsig expects <digest> <filename> <sig> [<d-modsig>] [<modsig>]",
+        ));
+    }
+    let digest = parse_prefixed_digest(fields[0])?;
+    let filename = unescape_filename(fields[1]);
+    let signature = decode_hex(fields[2])?;
+    let modsig_digest = fields
+        .get(3)
+        .map(|s| decode_hex(s))
+        .transpose()?
+        .unwrap_or_default();
+    let modsig = fields
+        .get(4)
+        .map(|s| decode_hex(s))
+        .transpose()?
+        .unwrap_or_default();
+    Ok((
+        TemplateData::ImaModsig(ImaModsigEntry {
+            digest,
+            filename,
+            signature,
+            modsig_digest,
+            modsig,
+        }),
+        Vec::new(),
+    ))
+}
+
+fn parse_evm_sig(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
+    if fields.len() < 9 {
+        return Err(Error::malformed("evm-sig expects 9 template fields"));
+    }
+    let digest = parse_prefixed_digest(fields[0])?;
+    let iuid: u32 = fields[6]
+        .parse()
+        .map_err(|_| Error::malformed("invalid iuid"))?;
+    let igid: u32 = fields[7]
+        .parse()
+        .map_err(|_| Error::malformed("invalid igid"))?;
+    let imode: u16 = fields[8]
+        .parse()
+        .map_err(|_| Error::malformed("invalid imode"))?;
+    Ok((
+        TemplateData::EvmSig(EvmSigEntry {
+            digest,
+            filename: unescape_filename(fields[1]),
+            evmsig: decode_hex(fields[2])?,
+            xattrnames: unescape_filename(fields[3]),
+            xattrlengths: decode_hex(fields[4])?,
+            xattrvalues: decode_hex(fields[5])?,
+            iuid,
+            igid,
+            imode,
+        }),
+        Vec::new(),
+    ))
 }
 
 fn parse_ima_ng(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
@@ -205,6 +309,23 @@ fn parse_prefixed_digest(s: &str) -> Result<Digest> {
         });
     }
     Ok(Digest::new(algo, bytes))
+}
+fn parse_prefixed_digest_v2(s: &str) -> Result<DigestV2> {
+    let mut it = s.splitn(3, ':');
+    let dtype = it
+        .next()
+        .ok_or_else(|| Error::malformed("missing digest type"))?;
+    let algo_name = it
+        .next()
+        .ok_or_else(|| Error::malformed("missing algorithm"))?;
+    let hex = it
+        .next()
+        .ok_or_else(|| Error::malformed("missing digest hex"))?;
+    let digest = parse_prefixed_digest(&format!("{algo_name}:{hex}"))?;
+    Ok(DigestV2 {
+        digest_type: DigestType::parse(dtype),
+        digest,
+    })
 }
 
 fn decode_hex(s: &str) -> Result<Vec<u8>> {
@@ -326,7 +447,7 @@ mod tests {
                     sha1:1801e1be3e65ef1eaa5c16617bec8f1274eaf6b3 boot_aggregate";
         let ev = parse_ascii_line(line).unwrap();
         assert_eq!(ev.pcr_index, 10);
-        assert_eq!(ev.template_name, "ima-ng");
+        assert_eq!(ev.template.as_str(), "ima-ng");
         match &ev.template_data {
             TemplateData::ImaNg(e) => {
                 assert_eq!(e.digest.algorithm, HashAlgorithm::Sha1);
@@ -363,7 +484,7 @@ sha1:1801e1be3e65ef1eaa5c16617bec8f1274eaf6b3 /init\n\
                     deadbeefdeadbeefdeadbeefdeadbeefdeadbeef \
                     weird-template foo bar baz";
         let ev = parse_ascii_line(line).unwrap();
-        assert_eq!(ev.template_name, "weird-template");
+        assert_eq!(ev.template.as_str(), "weird-template");
         match &ev.template_data {
             TemplateData::Unknown(fields) => {
                 let strs: Vec<&[u8]> = fields.iter().map(|f| f.data.as_slice()).collect();

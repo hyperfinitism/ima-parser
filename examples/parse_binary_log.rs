@@ -107,6 +107,7 @@ fn main() -> ExitCode {
             }
             TemplateData::ImaBuf(e) => format!("{} [{}] buf={}B", e.name, e.digest, e.buf.len()),
             TemplateData::Unknown(fields) => format!("{} unknown-field(s)", fields.len()),
+            _ => "other built-in template".to_owned(),
         };
         if args.verify {
             #[cfg(feature = "hash")]
@@ -119,10 +120,16 @@ fn main() -> ExitCode {
             let ok = "no-hash-feature";
             println!(
                 "PCR={:>2}  {:<8}  hash-ok={}  {hint}",
-                ev.pcr_index, ev.template_name, ok
+                ev.pcr_index,
+                ev.template.as_str(),
+                ok
             );
         } else {
-            println!("PCR={:>2}  {:<8}  {hint}", ev.pcr_index, ev.template_name);
+            println!(
+                "PCR={:>2}  {:<8}  {hint}",
+                ev.pcr_index,
+                ev.template.as_str()
+            );
         }
     }
     ExitCode::SUCCESS

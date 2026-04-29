@@ -7,9 +7,9 @@
 use crate::hash::HashAlgorithm;
 use crate::hash::Hasher;
 
+use super::IMA_EVENT_NAME_LEN_MAX;
 use super::event::Event;
-use super::template::{TemplateData, TemplateField};
-use super::{IMA_EVENT_NAME_LEN_MAX, IMA_TEMPLATE_NAME};
+use super::template::{Template, TemplateData, TemplateField};
 
 /// Internal: reconstruct the per-field framing that appears on the wire so
 /// we can feed it into a hash.
@@ -22,7 +22,7 @@ use super::{IMA_EVENT_NAME_LEN_MAX, IMA_TEMPLATE_NAME};
 ///
 /// For every other template each field becomes `<u32 LE length> || <bytes>`.
 pub(super) fn feed_event_into<H: Hasher + ?Sized>(hasher: &mut H, event: &Event) {
-    if event.template_name == IMA_TEMPLATE_NAME {
+    if event.template == Template::Ima {
         feed_legacy_ima(hasher, &event.template_data);
     } else {
         feed_generic(hasher, &event.template_data, &event.template_data_raw);
@@ -122,6 +122,71 @@ fn collect_fields(data: &TemplateData) -> Vec<TemplateField> {
                 data: e.buf.clone(),
             },
         ],
+        TemplateData::ImaModsig(e) => vec![
+            TemplateField {
+                data: encode_d_ng(&e.digest),
+            },
+            TemplateField {
+                data: encode_n_ng(&e.filename),
+            },
+            TemplateField {
+                data: e.signature.clone(),
+            },
+            TemplateField {
+                data: e.modsig_digest.clone(),
+            },
+            TemplateField {
+                data: e.modsig.clone(),
+            },
+        ],
+        TemplateData::ImaNgV2(e) => vec![
+            TemplateField {
+                data: encode_d_ngv2(&e.digest),
+            },
+            TemplateField {
+                data: encode_n_ng(&e.filename),
+            },
+        ],
+        TemplateData::ImaSigV2(e) => vec![
+            TemplateField {
+                data: encode_d_ngv2(&e.digest),
+            },
+            TemplateField {
+                data: encode_n_ng(&e.filename),
+            },
+            TemplateField {
+                data: e.signature.clone(),
+            },
+        ],
+        TemplateData::EvmSig(e) => vec![
+            TemplateField {
+                data: encode_d_ng(&e.digest),
+            },
+            TemplateField {
+                data: encode_n_ng(&e.filename),
+            },
+            TemplateField {
+                data: e.evmsig.clone(),
+            },
+            TemplateField {
+                data: encode_n_ng(&e.xattrnames),
+            },
+            TemplateField {
+                data: e.xattrlengths.clone(),
+            },
+            TemplateField {
+                data: e.xattrvalues.clone(),
+            },
+            TemplateField {
+                data: e.iuid.to_le_bytes().to_vec(),
+            },
+            TemplateField {
+                data: e.igid.to_le_bytes().to_vec(),
+            },
+            TemplateField {
+                data: e.imode.to_le_bytes().to_vec(),
+            },
+        ],
         TemplateData::Unknown(fields) => fields.clone(),
     }
 }
@@ -140,6 +205,16 @@ pub(crate) fn encode_n_ng(name: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(name.len() + 1);
     out.extend_from_slice(name.as_bytes());
     out.push(0);
+    out
+}
+pub(crate) fn encode_d_ngv2(digest: &crate::log::DigestV2) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(digest.digest_type.as_str().as_bytes());
+    out.push(b':');
+    out.extend_from_slice(digest.digest.algorithm.name().as_bytes());
+    out.push(b':');
+    out.push(0);
+    out.extend_from_slice(&digest.digest.bytes);
     out
 }
 

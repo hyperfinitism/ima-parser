@@ -5,7 +5,7 @@
 #[cfg(feature = "hash")]
 use crate::hash::HashAlgorithm;
 
-use super::template::TemplateData;
+use super::template::{Template, TemplateData};
 use super::template_hash;
 
 /// A single IMA measurement event.
@@ -17,7 +17,7 @@ use super::template_hash;
 /// 2. `template_hash` — digest covering the template's data bytes, computed
 ///    with the algorithm recorded in
 ///    [`ParseOptions::template_hash_algorithm`](super::parser::ParseOptions::with_template_hash_algorithm).
-/// 3. `template_name` — ASCII identifier of the template (`"ima"`,
+/// 3. `template` — ASCII identifier of the template (`"ima"`,
 ///    `"ima-ng"`, `"ima-sig"`, `"ima-buf"`, …).
 /// 4. `template_data` — decoded payload; see [`TemplateData`].
 /// 5. `template_data_raw` — unparsed template-data bytes, retained so the
@@ -32,7 +32,7 @@ pub struct Event {
     pub template_hash: Vec<u8>,
 
     /// Template name (e.g. `"ima-ng"`).
-    pub template_name: String,
+    pub template: Template,
 
     /// Decoded template payload.
     pub template_data: TemplateData,
