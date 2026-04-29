@@ -359,7 +359,11 @@ fn decode_ima_modsig(fields: &[Vec<u8>]) -> Result<TemplateData> {
         digest: decode_d_ng(&fields[0])?,
         filename: decode_n_ng(&fields[1])?,
         signature: fields[2].clone(),
-        modsig_digest: fields[3].clone(),
+        modsig_digest: if fields[3].is_empty() {
+            None
+        } else {
+            Some(decode_d_ng(&fields[3])?)
+        },
         modsig: fields[4].clone(),
     }))
 }
@@ -1120,13 +1124,13 @@ mod tests {
     fn parse_ima_modsig_roundtrip() {
         let digest = [0x55u8; 20];
         let sig = b"sig";
-        let modsig_d = b"modsig-digest";
+        let modsig_d = [0x77u8; 32];
         let modsig = b"modsig-payload";
         let td = frame_fields(&[
             &d_ng_field(HashAlgorithm::Sha1, &digest),
             &n_ng_field("/lib/modules/x.ko"),
             sig,
-            modsig_d,
+            &d_ng_field(HashAlgorithm::Sha256, &modsig_d),
             modsig,
         ]);
         let event = build_event(12, &[0; 20], "ima-modsig", &td);
@@ -1138,7 +1142,9 @@ mod tests {
             TemplateData::ImaModsig(e) => {
                 assert_eq!(e.filename, "/lib/modules/x.ko");
                 assert_eq!(e.signature, sig);
-                assert_eq!(e.modsig_digest, modsig_d);
+                let parsed_modsig_d = e.modsig_digest.expect("d-modsig should decode");
+                assert_eq!(parsed_modsig_d.algorithm, HashAlgorithm::Sha256);
+                assert_eq!(parsed_modsig_d.bytes, modsig_d);
                 assert_eq!(e.modsig, modsig);
                 assert_eq!(e.digest.bytes, digest);
             }

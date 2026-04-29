@@ -133,7 +133,7 @@ fn collect_fields(data: &TemplateData) -> Vec<TemplateField> {
                 data: e.signature.clone(),
             },
             TemplateField {
-                data: e.modsig_digest.clone(),
+                data: e.modsig_digest.as_ref().map_or_else(Vec::new, encode_d_ng),
             },
             TemplateField {
                 data: e.modsig.clone(),

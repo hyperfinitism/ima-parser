@@ -161,9 +161,8 @@ fn parse_ima_modsig(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
     let signature = decode_hex(fields[2])?;
     let modsig_digest = fields
         .get(3)
-        .map(|s| decode_hex(s))
-        .transpose()?
-        .unwrap_or_default();
+        .map(|s| parse_prefixed_digest(s))
+        .transpose()?;
     let modsig = fields
         .get(4)
         .map(|s| decode_hex(s))

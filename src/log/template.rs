@@ -154,8 +154,8 @@ pub struct ImaModsigEntry {
     /// Raw `security.ima` signature (`sig`).
     pub signature: Vec<u8>,
     /// Module-signature digest field (`d-modsig`).
-    pub modsig_digest: Vec<u8>,
-    /// Raw appended module signature (`modsig`).
+    pub modsig_digest: Option<Digest>,
+    /// Raw appended module signature (`modsig`), PKCS#7 DER.
     pub modsig: Vec<u8>,
 }
 
