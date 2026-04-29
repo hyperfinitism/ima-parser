@@ -50,7 +50,7 @@ fn binary_parser_yields_multiple_events() {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     assert_eq!(events.len(), 2);
-    assert_eq!(events[0].template_name, "ima-ng");
+    assert_eq!(events[0].template.as_str(), "ima-ng");
 }
 
 #[cfg(feature = "hash")]
@@ -154,7 +154,7 @@ fn ascii_and_binary_agree_on_decoded_form() {
     let from_ascii = parse_ascii_log(&ascii_line).unwrap().remove(0);
 
     assert_eq!(from_binary.pcr_index, from_ascii.pcr_index);
-    assert_eq!(from_binary.template_name, from_ascii.template_name);
+    assert_eq!(from_binary.template.as_str(), from_ascii.template.as_str());
     match (&from_binary.template_data, &from_ascii.template_data) {
         (TemplateData::ImaNg(a), TemplateData::ImaNg(b)) => {
             assert_eq!(a, b);

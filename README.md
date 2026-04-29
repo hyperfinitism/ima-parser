@@ -55,7 +55,7 @@ let opts = ParseOptions::default()
     .with_template_hash_algorithm(HashAlgorithm::Sha1);
 for event in EventLogParser::new(bytes.as_slice(), opts) {
     let event = event?;
-    println!("PCR {} {}", event.pcr_index, event.template_name);
+    println!("PCR {} {}", event.pcr_index, event.template);
 }
 ```
 
@@ -67,7 +67,7 @@ use ima_parser::log::parse_ascii_log;
 let line = "10 91f34b5c671d73504b274a919661cf80dab1e127 ima-ng sha1:1801e1be3e65ef1eaa5c16617bec8f1274eaf6b3 boot_aggregate\n";
 let events = parse_ascii_log(line).unwrap();
 assert_eq!(events.len(), 1);
-assert_eq!(events[0].template_name, "ima-ng");
+assert_eq!(events[0].template.as_str(), "ima-ng");
 ```
 
 #### Recomputing a template hash

@@ -26,7 +26,9 @@ pub use self::ascii::{parse_ascii_line, parse_ascii_log};
 pub use self::event::Event;
 pub use self::parser::{Endianness, EventLogParser, ParseOptions};
 pub use self::template::{
-    Digest, ImaBufEntry, ImaEntry, ImaNgEntry, ImaSigEntry, TemplateData, TemplateField,
+    Digest, DigestType, DigestV2, EvmSigEntry, ImaBufEntry, ImaEntry, ImaModsigEntry, ImaNgEntry,
+    ImaNgV2Entry, ImaSigEntry, ImaSigV2Entry, Template, TemplateData, TemplateField,
+    TemplateFieldId,
 };
 
 /// Default PCR index used by IMA (`CONFIG_IMA_MEASURE_PCR_IDX`).
@@ -36,12 +38,3 @@ pub const DEFAULT_IMA_PCR: u32 = 10;
 /// The legacy `ima` template pads the `n` field to this size plus one when
 /// computing the template hash.
 pub const IMA_EVENT_NAME_LEN_MAX: usize = 255;
-
-/// Template name of the legacy fixed-format template.
-pub const IMA_TEMPLATE_NAME: &str = "ima";
-/// Template name of the `ima-ng` (next-generation) template.
-pub const IMA_NG_TEMPLATE_NAME: &str = "ima-ng";
-/// Template name of the `ima-sig` template.
-pub const IMA_SIG_TEMPLATE_NAME: &str = "ima-sig";
-/// Template name of the `ima-buf` template.
-pub const IMA_BUF_TEMPLATE_NAME: &str = "ima-buf";
