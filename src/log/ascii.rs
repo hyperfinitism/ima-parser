@@ -11,10 +11,14 @@
 //! with SP (`' '`) as the token separator and LF (`'\n'`) as the record
 //! separator. Template-specific fields are:
 //!
-//! * `ima`: `<filedata_hex_20B> <filename>`
-//! * `ima-ng`: `<algo>:<filedata_hex> <filename>`
-//! * `ima-sig`: `<algo>:<filedata_hex> <filename> [<signature_hex>]`
-//! * `ima-buf`: `<algo>:<filedata_hex> <name> <buffer_hex>`
+//! - `ima`: `d | n`
+//! - `ima-ng`: `d-ng | n-ng`
+//! - `ima-ngv2`: `d-ngv2 | n-ng`
+//! - `ima-sig`: `d-ng | n-ng | sig`
+//! - `ima-sigv2`: `d-ngv2 | n-ng | sig`
+//! - `ima-buf`: `d-ng | n-ng | buf`
+//! - `ima-modsig`: `d-ng | n-ng | sig | d-modsig | modsig`
+//! - `evm-sig`: `d-ng | n-ng | evmsig | xattrnames | xattrlengths | xattrvalues | iuid | igid | imode`
 //!
 //! The `filename` may contain spaces; the kernel escapes those as `\x20`.
 
