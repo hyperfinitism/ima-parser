@@ -11,10 +11,14 @@
 //! with SP (`' '`) as the token separator and LF (`'\n'`) as the record
 //! separator. Template-specific fields are:
 //!
-//! * `ima`: `<filedata_hex_20B> <filename>`
-//! * `ima-ng`: `<algo>:<filedata_hex> <filename>`
-//! * `ima-sig`: `<algo>:<filedata_hex> <filename> [<signature_hex>]`
-//! * `ima-buf`: `<algo>:<filedata_hex> <name> <buffer_hex>`
+//! - `ima`: `d | n`
+//! - `ima-ng`: `d-ng | n-ng`
+//! - `ima-ngv2`: `d-ngv2 | n-ngv2`
+//! - `ima-sig`: `d-ng | n-ng | sig`
+//! - `ima-sigv2`: `d-ngv2 | n-ngv2 | sig`
+//! - `ima-buf`: `d-ng | n-ng | buf`
+//! - `ima-modsig`: `d-ng | n-ng | sig | d-modsig | modsig`
+//! - `evm-sig`: `d-ng | n-ng | evmsig | xattrnames | xattrlengths | xattrvalues | iuid | igid | imode`
 //!
 //! The `filename` may contain spaces; the kernel escapes those as `\x20`.
 
@@ -158,16 +162,15 @@ fn parse_ima_modsig(fields: &[&str]) -> Result<(TemplateData, Vec<u8>)> {
     }
     let digest = parse_prefixed_digest(fields[0])?;
     let filename = unescape_filename(fields[1]);
-    let signature = decode_hex(fields[2])?;
+    let signature = decode_hex(fields[2]).unwrap_or_default();
+    // d-modsig and modsig are populated only if there is an appended signature.
     let modsig_digest = fields
         .get(3)
-        .map(|s| decode_hex(s))
-        .transpose()?
+        .map(|s| decode_hex(s).unwrap_or_default())
         .unwrap_or_default();
     let modsig = fields
         .get(4)
-        .map(|s| decode_hex(s))
-        .transpose()?
+        .map(|s| decode_hex(s).unwrap_or_default())
         .unwrap_or_default();
     Ok((
         TemplateData::ImaModsig(ImaModsigEntry {
